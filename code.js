@@ -4,89 +4,97 @@ figma.showUI(__html__);
 const noise = (x, y) => Math.random();
 figma.ui.onmessage = (msg) => {
     if (msg.type === "create-rectangles") {
-        const nodes = [];
-        const maskNodes = [];
-        const [cols, rows] = randomColsAndRows(noise, 100, 16, 10);
+        const [cols, rows] = randomColsAndRows(noise, 120, 6, 6);
         const quads = generateQuads(cols, rows);
         const styleWeights = [
-            ["HALF1", 0.1],
-            ["HALF2", 0.1],
-            ["HALF3", 0.1],
-            ["HALF4", 0.1],
-            ["QUARTER1", 0.1],
-            ["QUARTER2", 0.1],
-            ["QUARTER3", 0.1],
-            ["QUARTER4", 0.1],
+            ["HALF1", 0.055],
+            ["HALF2", 0.055],
+            ["HALF3", 0.055],
+            ["HALF4", 0.055],
+            ["QUARTER1", 0.145],
+            ["QUARTER2", 0.145],
+            ["QUARTER3", 0.145],
+            ["QUARTER4", 0.145],
             ["NONE", 0.2],
+        ];
+        const palleteWeights = [
+            [hexColorToRGB("#FFFFFF"), 0.3],
+            [hexColorToRGB("#FD936A"), 0.186667],
+            [hexColorToRGB("#FDAE67"), 0.166667],
+            [hexColorToRGB("#FD7267"), 0.166667],
+            [hexColorToRGB("#A185B6"), 0.056667],
+            [hexColorToRGB("#CE87CC"), 0.056667],
+            [hexColorToRGB("#FC6B83"), 0.066667],
         ];
         const strokeColor = hexColorToRGB("#040404");
         const maskColor = hexColorToRGB("#FFFFFF");
-        const palleteWeights = [
-            [hexColorToRGB("#FFFFFF"), 0.3],
-            [hexColorToRGB("#FBAB69"), 0.11667],
-            [hexColorToRGB("#E58D67"), 0.11667],
-            [hexColorToRGB("#FD8066"), 0.11667],
-            [hexColorToRGB("#89AAA4"), 0.11667],
-            [hexColorToRGB("#95A78F"), 0.11667],
-            [hexColorToRGB("#CDC5BF"), 0.11667],
-        ];
-        quads.forEach((quad) => {
-            const rect = figma.createRectangle();
-            const r = quadToRect(quad);
-            const style = pick(styleWeights);
-            const rad = paneviaBorder(style);
-            // if (r.w > r.h && style !== "NONE") {
-            if (style === "HALF4") {
-                r.x += r.w - r.h / 2; // align to right
-                r.w = r.h / 2;
-            }
-            else if (style === "HALF2") {
-                r.w = r.h / 2;
-            }
-            // }
-            // if (r.w < r.h && style !== "NONE") {
-            if (style === "HALF3") {
-                r.h = r.w / 2;
-            }
-            else if (style === "HALF1") {
-                r.y += r.h - r.w / 2; // align to bottom
-                r.h = r.w / 2;
-            }
-            // }
-            rect.x = r.x;
-            rect.y = r.y;
-            rect.resize(r.w, r.h);
-            rect.topLeftRadius = rad[0];
-            rect.topRightRadius = rad[1];
-            rect.bottomRightRadius = rad[2];
-            rect.bottomLeftRadius = rad[3];
-            const color = pick(palleteWeights);
-            rect.fills = [
-                {
-                    type: "SOLID",
-                    color: color,
-                    opacity: 1,
-                },
-            ];
-            rect.strokeAlign = "CENTER";
-            rect.strokeWeight = 2;
-            rect.strokes = [
-                {
-                    type: "SOLID",
-                    color: strokeColor,
-                },
-            ];
-            figma.currentPage.appendChild(rect);
-            nodes.push(rect);
-            if (color.r === maskColor.r && color.g === maskColor.g && color.g === maskColor.b) {
-                maskNodes.push(rect);
-            }
-        });
+        const [nodes, maskNodes] = renderQuads(quads, styleWeights, palleteWeights, maskColor, strokeColor);
+        renderQuads(quads, styleWeights, palleteWeights, maskColor, strokeColor, true, 0.65);
         figma.group(maskNodes, figma.currentPage);
         figma.currentPage.selection = nodes;
         figma.viewport.scrollAndZoomIntoView(nodes);
     }
     figma.closePlugin();
+};
+const renderQuads = (quads, styleWeights, palleteWeights, maskColor, strokeColor, onlyOutline = false, density = 1) => {
+    const nodes = [];
+    const maskNodes = [];
+    quads.forEach((quad) => {
+        if (Math.random() > density) {
+            return;
+        }
+        const rect = figma.createRectangle();
+        const r = quadToRect(quad);
+        const style = pick(styleWeights);
+        const rad = paneviaBorder(style);
+        // if (r.w > r.h && style !== "NONE") {
+        if (style === "HALF4") {
+            r.x += r.w - r.h / 2; // align to right
+            r.w = r.h / 2;
+        }
+        else if (style === "HALF2") {
+            r.w = r.h / 2;
+        }
+        // }
+        // if (r.w < r.h && style !== "NONE") {
+        if (style === "HALF3") {
+            r.h = r.w / 2;
+        }
+        else if (style === "HALF1") {
+            r.y += r.h - r.w / 2; // align to bottom
+            r.h = r.w / 2;
+        }
+        // }
+        rect.x = r.x;
+        rect.y = r.y;
+        rect.resize(r.w, r.h);
+        rect.topLeftRadius = rad[0];
+        rect.topRightRadius = rad[1];
+        rect.bottomRightRadius = rad[2];
+        rect.bottomLeftRadius = rad[3];
+        const color = pick(palleteWeights);
+        rect.fills = [
+            {
+                type: "SOLID",
+                color: color,
+                opacity: onlyOutline ? 0 : 1,
+            },
+        ];
+        rect.strokeAlign = "CENTER";
+        rect.strokeWeight = 2;
+        rect.strokes = [
+            {
+                type: "SOLID",
+                color: strokeColor,
+            },
+        ];
+        figma.currentPage.appendChild(rect);
+        nodes.push(rect);
+        if (color.r === maskColor.r && color.g === maskColor.g && color.g === maskColor.b) {
+            maskNodes.push(rect);
+        }
+    });
+    return [nodes, maskNodes];
 };
 const paneviaBorder = (type) => {
     let radius = [0, 0, 0, 0];
@@ -126,6 +134,24 @@ const paneviaBorder = (type) => {
     return radius;
 };
 const randomColsAndRows = (noise, l, cols, rows, seed) => {
+    let columnsArray = [];
+    let rowsArray = [];
+    // const posibleSizes = [l, PHI * l];
+    const distribution = [
+        [l, 0.3],
+        [PHI * l, 0.7],
+    ];
+    for (let c = 0; c < cols; c++) {
+        const d = pick(distribution);
+        columnsArray.push(d);
+    }
+    for (let r = 0; r < rows; r++) {
+        const d = pick(distribution);
+        rowsArray.push(d);
+    }
+    return [columnsArray, rowsArray];
+};
+const classicDistribution = (l, cols, rows) => {
     let columnsArray = [];
     let rowsArray = [];
     for (let c = 0; c < cols; c++) {

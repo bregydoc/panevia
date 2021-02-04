@@ -24,100 +24,38 @@ const noise = (x: number, y: number): number => Math.random();
 
 figma.ui.onmessage = (msg) => {
     if (msg.type === "create-rectangles") {
-        const nodes: SceneNode[] = [];
-        const maskNodes: SceneNode[] = [];
-
-        const [cols, rows] = randomColsAndRows(noise, 100, 16, 10);
+        const [cols, rows] = randomColsAndRows(noise, 120, 6, 6);
 
         const quads = generateQuads(cols, rows);
 
         const styleWeights: [QuadStyle, number][] = [
-            ["HALF1", 0.1],
-            ["HALF2", 0.1],
-            ["HALF3", 0.1],
-            ["HALF4", 0.1],
-            ["QUARTER1", 0.1],
-            ["QUARTER2", 0.1],
-            ["QUARTER3", 0.1],
-            ["QUARTER4", 0.1],
+            ["HALF1", 0.055],
+            ["HALF2", 0.055],
+            ["HALF3", 0.055],
+            ["HALF4", 0.055],
+            ["QUARTER1", 0.145],
+            ["QUARTER2", 0.145],
+            ["QUARTER3", 0.145],
+            ["QUARTER4", 0.145],
             ["NONE", 0.2],
+        ];
+
+        const palleteWeights: [RGB, number][] = [
+            [hexColorToRGB("#FFFFFF"), 0.3],
+            [hexColorToRGB("#FD936A"), 0.176667],
+            [hexColorToRGB("#FDAE67"), 0.166667],
+            [hexColorToRGB("#FD7267"), 0.166667],
+            [hexColorToRGB("#A185B6"), 0.056667],
+            [hexColorToRGB("#CE87CC"), 0.056667],
+            [hexColorToRGB("#FC6B83"), 0.066667],
         ];
 
         const strokeColor = hexColorToRGB("#040404");
         const maskColor = hexColorToRGB("#FFFFFF");
 
-        const palleteWeights: [RGB, number][] = [
-            [hexColorToRGB("#FFFFFF"), 0.3],
-            [hexColorToRGB("#FBAB69"), 0.11667],
-            [hexColorToRGB("#E58D67"), 0.11667],
-            [hexColorToRGB("#FD8066"), 0.11667],
-            [hexColorToRGB("#89AAA4"), 0.11667],
-            [hexColorToRGB("#95A78F"), 0.11667],
-            [hexColorToRGB("#CDC5BF"), 0.11667],
-        ];
+        const [nodes, maskNodes] = renderQuads(quads, styleWeights, palleteWeights, maskColor, strokeColor);
 
-        quads.forEach((quad) => {
-            const rect = figma.createRectangle();
-            const r = quadToRect(quad);
-
-            const style = pick<QuadStyle>(styleWeights);
-
-            const rad = paneviaBorder(style);
-
-            // if (r.w > r.h && style !== "NONE") {
-            if (style === "HALF4") {
-                r.x += r.w - r.h / 2; // align to right
-                r.w = r.h / 2;
-            } else if (style === "HALF2") {
-                r.w = r.h / 2;
-            }
-            // }
-
-            // if (r.w < r.h && style !== "NONE") {
-            if (style === "HALF3") {
-                r.h = r.w / 2;
-            } else if (style === "HALF1") {
-                r.y += r.h - r.w / 2; // align to bottom
-                r.h = r.w / 2;
-            }
-            // }
-
-            rect.x = r.x;
-            rect.y = r.y;
-
-            rect.resize(r.w, r.h);
-
-            rect.topLeftRadius = rad[0];
-            rect.topRightRadius = rad[1];
-            rect.bottomRightRadius = rad[2];
-            rect.bottomLeftRadius = rad[3];
-
-            const color = pick<RGB>(palleteWeights);
-
-            rect.fills = [
-                {
-                    type: "SOLID",
-                    color: color,
-                    opacity: 1,
-                },
-            ];
-
-            rect.strokeAlign = "CENTER";
-            rect.strokeWeight = 2;
-            rect.strokes = [
-                {
-                    type: "SOLID",
-                    color: strokeColor,
-                },
-            ];
-
-            figma.currentPage.appendChild(rect);
-            nodes.push(rect);
-
-            if (color.r === maskColor.r && color.g === maskColor.g && color.g === maskColor.b) {
-                maskNodes.push(rect);
-            }
-        });
+        renderQuads(quads, styleWeights, palleteWeights, maskColor, strokeColor, true, 0.5);
 
         figma.group(maskNodes, figma.currentPage);
 
@@ -126,6 +64,87 @@ figma.ui.onmessage = (msg) => {
     }
 
     figma.closePlugin();
+};
+
+const renderQuads = (
+    quads: Quad[],
+    styleWeights: [QuadStyle, number][],
+    palleteWeights: [RGB, number][],
+    maskColor: RGB,
+    strokeColor: RGB,
+    onlyOutline: Boolean = false,
+    density: number = 1
+): [SceneNode[], SceneNode[]] => {
+    const nodes: SceneNode[] = [];
+    const maskNodes: SceneNode[] = [];
+
+    quads.forEach((quad) => {
+        if (Math.random() > density) {
+            return;
+        }
+
+        const rect = figma.createRectangle();
+        const r = quadToRect(quad);
+
+        const style = pick<QuadStyle>(styleWeights);
+
+        const rad = paneviaBorder(style);
+
+        // if (r.w > r.h && style !== "NONE") {
+        if (style === "HALF4") {
+            r.x += r.w - r.h / 2; // align to right
+            r.w = r.h / 2;
+        } else if (style === "HALF2") {
+            r.w = r.h / 2;
+        }
+        // }
+
+        // if (r.w < r.h && style !== "NONE") {
+        if (style === "HALF3") {
+            r.h = r.w / 2;
+        } else if (style === "HALF1") {
+            r.y += r.h - r.w / 2; // align to bottom
+            r.h = r.w / 2;
+        }
+        // }
+
+        rect.x = r.x;
+        rect.y = r.y;
+
+        rect.resize(r.w, r.h);
+
+        rect.topLeftRadius = rad[0];
+        rect.topRightRadius = rad[1];
+        rect.bottomRightRadius = rad[2];
+        rect.bottomLeftRadius = rad[3];
+
+        const color = pick<RGB>(palleteWeights);
+
+        rect.fills = [
+            {
+                type: "SOLID",
+                color: color,
+                opacity: onlyOutline ? 0 : 1,
+            },
+        ];
+
+        rect.strokeAlign = "CENTER";
+        rect.strokeWeight = 2;
+        rect.strokes = [
+            {
+                type: "SOLID",
+                color: strokeColor,
+            },
+        ];
+
+        figma.currentPage.appendChild(rect);
+        nodes.push(rect);
+
+        if (color.r === maskColor.r && color.g === maskColor.g && color.g === maskColor.b) {
+            maskNodes.push(rect);
+        }
+    });
+    return [nodes, maskNodes];
 };
 
 const paneviaBorder = (type: QuadStyle): [number, number, number, number] => {
@@ -177,6 +196,30 @@ const randomColsAndRows = (
     rows: number,
     seed?: number
 ): [number[], number[]] => {
+    let columnsArray: number[] = [];
+    let rowsArray: number[] = [];
+
+    // const posibleSizes = [l, PHI * l];
+
+    const distribution: [number, number][] = [
+        [l, 0.3],
+        [PHI * l, 0.7],
+    ];
+
+    for (let c = 0; c < cols; c++) {
+        const d = pick<number>(distribution);
+        columnsArray.push(d);
+    }
+
+    for (let r = 0; r < rows; r++) {
+        const d = pick<number>(distribution);
+        rowsArray.push(d);
+    }
+
+    return [columnsArray, rowsArray];
+};
+
+const classicDistribution = (l: number, cols: number, rows: number): [number[], number[]] => {
     let columnsArray: number[] = [];
     let rowsArray: number[] = [];
 
